@@ -269,6 +269,16 @@ public:
     bool get_spiral_vase_mode() const;
     void set_spiral_vase_mode(bool spiral_mode, bool as_global);
 
+    // Per-plate prime tower overrides. The list is the set of option keys
+    // shown in the Multimaterial > Prime tower group on the Print tab.
+    static const std::vector<std::string>& prime_tower_override_keys();
+    bool has_prime_tower_override(const std::string& key) const;
+    bool has_any_prime_tower_override() const;
+    const ConfigOption* get_prime_tower_override(const std::string& key) const;
+    // Takes ownership of `opt`. Passing nullptr erases the override.
+    void set_prime_tower_override(const std::string& key, ConfigOption* opt);
+    void clear_prime_tower_overrides();
+
     std::vector<Vec2d> get_plate_wrapping_detection_area() const;
 
     //static const int plate_x_offset = 20; //mm

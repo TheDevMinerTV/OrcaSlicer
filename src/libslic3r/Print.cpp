@@ -3092,7 +3092,20 @@ bool Print::has_wipe_tower() const
         if (enable_timelapse_print())
             return true;
 
-        return !m_config.spiral_mode.value && m_config.filament_diameter.values.size() > 1;
+        if (m_config.spiral_mode.value)
+            return false;
+
+        // Use the count of filaments actually used on this plate, not the count
+        // configured on the printer. Avoids false positives that block slicing
+        // (e.g. the variable-layer-height check) when a tower would not actually
+        // be generated because only one filament is in use.
+        const auto used = this->extruders();
+        if (!used.empty())
+            return used.size() > 1;
+
+        // Fallback for callers invoked before objects are populated: keep the
+        // historical behaviour based on configured filament count.
+        return m_config.filament_diameter.values.size() > 1;
     }
     return false;
 }

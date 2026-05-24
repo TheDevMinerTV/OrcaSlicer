@@ -1,6 +1,18 @@
 #include "PlateSettingsDialog.hpp"
+
+#include <wx/scrolwin.h>
+#include <wx/sizer.h>
+#include <wx/stattext.h>
+
+#include "GUI_App.hpp"
+#include "I18N.hpp"
 #include "MsgDialog.hpp"
+#include "OptionsGroup.hpp"
+#include "Plater.hpp"
+#include "PresetBundle.hpp"
 #include "Widgets/DialogButtons.hpp"
+#include "Widgets/Label.hpp"
+#include "libslic3r/PrintConfig.hpp"
 
 namespace Slic3r { namespace GUI {
 static constexpr int MIN_LAYER_VALUE = 2;
@@ -472,6 +484,27 @@ PlateSettingsDialog::PlateSettingsDialog(wxWindow* parent, const wxString& title
     m_sizer_main->AddSpacer(FromDIP(5));
     m_sizer_main->Add(m_other_layers_seq_panel, 0, wxEXPAND | wxLEFT | wxRIGHT, FromDIP(30));
 
+    // Per-plate prime tower overrides. Hidden in only_layer_seq mode.
+    {
+        wxStaticBox* pt_box = new wxStaticBox(this, wxID_ANY, _L("Prime tower (per-plate override)"));
+        m_prime_tower_box = new wxStaticBoxSizer(pt_box, wxVERTICAL);
+
+        wxStaticText* pt_hint = new wxStaticText(pt_box, wxID_ANY,
+            _L("Edit any field to override its value on this plate. Use the reset button on a row to revert to the global value."));
+        pt_hint->SetFont(::Label::Body_12);
+        pt_hint->Wrap(FromDIP(560));
+        m_prime_tower_box->Add(pt_hint, 0, wxALL, FromDIP(5));
+
+        m_prime_tower_panel = new wxScrolledWindow(pt_box, wxID_ANY, wxDefaultPosition,
+            wxSize(FromDIP(600), FromDIP(260)), wxVSCROLL | wxHSCROLL);
+        m_prime_tower_panel->SetBackgroundColour(*wxWHITE);
+        m_prime_tower_panel->SetScrollRate(FromDIP(10), FromDIP(10));
+        m_prime_tower_box->Add(m_prime_tower_panel, 1, wxEXPAND | wxALL, FromDIP(5));
+
+        m_sizer_main->AddSpacer(FromDIP(10));
+        m_sizer_main->Add(m_prime_tower_box, 0, wxEXPAND | wxLEFT | wxRIGHT, FromDIP(30));
+    }
+
     auto dlg_btns = new DialogButtons(this, {"OK", "Cancel"});
 
     dlg_btns->GetOK()->Bind(wxEVT_BUTTON, [this](auto& e) {
@@ -513,9 +546,104 @@ PlateSettingsDialog::PlateSettingsDialog(wxWindow* parent, const wxString& title
         m_first_layer_print_seq_choice->Show();
         m_drag_canvas->Show();
         m_other_layers_seq_panel->Show();
+        if (m_prime_tower_box)
+            m_sizer_main->Hide(m_prime_tower_box);
         Layout();
         Fit();
     }
+}
+
+void PlateSettingsDialog::sync_prime_tower(const DynamicPrintConfig& global_config, const PartPlate& plate)
+{
+    if (!m_prime_tower_panel)
+        return;
+
+    const auto& keys = PartPlate::prime_tower_override_keys();
+
+    // Build the transient configs. m_prime_tower_global_config keeps the
+    // global snapshot so per-row reset can restore it; m_prime_tower_config
+    // is what the user edits — seeded from global, then overlaid with any
+    // existing plate overrides.
+    m_prime_tower_global_config.clear();
+    m_prime_tower_config.clear();
+    m_prime_tower_overridden_keys.clear();
+
+    for (const std::string& key : keys) {
+        const ConfigOption* g = global_config.option(key);
+        if (g == nullptr)
+            continue; // Option not present in the current preset (shouldn't happen, but be safe).
+        m_prime_tower_global_config.set_key_value(key, g->clone());
+        m_prime_tower_config.set_key_value(key, g->clone());
+    }
+
+    for (const std::string& key : keys) {
+        if (!plate.has_prime_tower_override(key))
+            continue;
+        const ConfigOption* po = plate.get_prime_tower_override(key);
+        if (po == nullptr)
+            continue;
+        m_prime_tower_config.set_key_value(key, po->clone());
+        m_prime_tower_overridden_keys.insert(key);
+    }
+
+    // sync_prime_tower is expected to be called exactly once per dialog
+    // instance (a fresh PlateSettingsDialog is constructed each time the user
+    // opens it from the plate UI).
+    assert(!m_prime_tower_optgroup);
+
+    // extra_column: per-row "reset to global" button. Clicking it removes the
+    // key from the overridden set and reloads the field with the global value.
+    auto extra_column = [this](wxWindow* parent, const Line& line) -> wxWindow* {
+        const auto& opts = line.get_options();
+        if (opts.empty())
+            return nullptr;
+        const std::string opt_key = opts.front().opt_id;
+
+        wxButton* btn = new wxButton(parent, wxID_ANY, _L("Reset"),
+            wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+        btn->SetToolTip(_L("Reset this row to the global value (remove the per-plate override)."));
+        btn->Bind(wxEVT_BUTTON, [this, opt_key](wxCommandEvent&) {
+            const ConfigOption* g = m_prime_tower_global_config.option(opt_key);
+            if (g == nullptr)
+                return;
+            m_prime_tower_config.set_key_value(opt_key, g->clone());
+            m_prime_tower_overridden_keys.erase(opt_key);
+            if (m_prime_tower_optgroup)
+                m_prime_tower_optgroup->reload_config();
+        });
+        return btn;
+    };
+
+    m_prime_tower_optgroup = std::make_shared<ConfigOptionsGroup>(m_prime_tower_panel,
+        _L("Prime tower"), &m_prime_tower_config, /*is_tab_opt=*/false, extra_column);
+    m_prime_tower_optgroup->label_width = 22;
+    m_prime_tower_optgroup->sidetext_width = 6;
+
+    // Mark a key as overridden the moment the user touches the corresponding
+    // field. ConfigOptionsGroup::on_change_OG (called by the field) writes the
+    // new value into m_prime_tower_config before this fires, so we only need
+    // to track the key here.
+    m_prime_tower_optgroup->m_on_change = [this](const t_config_option_key& opt_id, const boost::any&) {
+        m_prime_tower_overridden_keys.insert(opt_id);
+    };
+
+    for (const std::string& key : keys) {
+        if (!m_prime_tower_config.has(key))
+            continue;
+        Option opt = m_prime_tower_optgroup->get_option(key);
+        m_prime_tower_optgroup->append_single_option_line(opt);
+    }
+
+    m_prime_tower_optgroup->activate();
+    m_prime_tower_optgroup->reload_config();
+
+    // The panel takes ownership of the optgroup's sizer; the optgroup's
+    // destructor only clears references, it does not delete the sizer itself.
+    m_prime_tower_panel->SetSizer(m_prime_tower_optgroup->sizer);
+    m_prime_tower_panel->FitInside();
+    m_prime_tower_panel->Layout();
+    Layout();
+    Fit();
 }
 
 PlateSettingsDialog::~PlateSettingsDialog()

@@ -384,6 +384,71 @@ void PartPlate::set_spiral_vase_mode(bool spiral_mode, bool as_global)
 	}
 }
 
+// Option keys overridable per plate from the Plate Settings dialog. Matches the
+// Multimaterial > Prime tower group in Tab.cpp::build_print(). wipe_tower_x and
+// wipe_tower_y are intentionally omitted: they are already per-plate via
+// ConfigOptionFloats indexed by plate, not via the plate override mechanism.
+const std::vector<std::string>& PartPlate::prime_tower_override_keys()
+{
+	static const std::vector<std::string> keys = {
+		"enable_prime_tower",
+		"prime_tower_skip_points",
+		"enable_tower_interface_features",
+		"enable_tower_interface_cooldown_during_tower",
+		"prime_tower_enable_framework",
+		"prime_tower_width",
+		"prime_volume",
+		"prime_tower_brim_width",
+		"prime_tower_infill_gap",
+		"wipe_tower_rotation_angle",
+		"wipe_tower_bridging",
+		"wipe_tower_extra_spacing",
+		"wipe_tower_extra_flow",
+		"wipe_tower_max_purge_speed",
+		"wipe_tower_wall_type",
+		"wipe_tower_cone_angle",
+		"wipe_tower_extra_rib_length",
+		"wipe_tower_rib_width",
+		"wipe_tower_fillet_wall",
+		"wipe_tower_no_sparse_layers",
+		"single_extruder_multi_material_priming",
+	};
+	return keys;
+}
+
+bool PartPlate::has_prime_tower_override(const std::string& key) const
+{
+	return m_config.has(key);
+}
+
+bool PartPlate::has_any_prime_tower_override() const
+{
+	for (const std::string& key : prime_tower_override_keys())
+		if (m_config.has(key))
+			return true;
+	return false;
+}
+
+const ConfigOption* PartPlate::get_prime_tower_override(const std::string& key) const
+{
+	return m_config.option(key);
+}
+
+void PartPlate::set_prime_tower_override(const std::string& key, ConfigOption* opt)
+{
+	if (opt == nullptr) {
+		m_config.erase(key);
+		return;
+	}
+	m_config.set_key_value(key, opt);
+}
+
+void PartPlate::clear_prime_tower_overrides()
+{
+	for (const std::string& key : prime_tower_override_keys())
+		m_config.erase(key);
+}
+
 bool PartPlate::valid_instance(int obj_id, int instance_id)
 {
 	if ((obj_id >= 0) && (obj_id < m_model->objects.size()))
@@ -1187,7 +1252,7 @@ void PartPlate::render_icons(bool bottom, bool only_name, int hover_id)
 
 
 			if (m_partplate_list->render_plate_settings) {
-				bool has_plate_settings = get_bed_type() != BedType::btDefault || get_print_seq() != PrintSequence::ByDefault || !get_first_layer_print_sequence().empty() || !get_other_layers_print_sequence().empty() || has_spiral_mode_config();
+				bool has_plate_settings = get_bed_type() != BedType::btDefault || get_print_seq() != PrintSequence::ByDefault || !get_first_layer_print_sequence().empty() || !get_other_layers_print_sequence().empty() || has_spiral_mode_config() || has_any_prime_tower_override();
                 if (hover_id == 5) {
                     if (!has_plate_settings)
                         render_icon_texture(m_plate_settings_icon.model, m_partplate_list->m_plate_settings_hovered_texture);

@@ -1,6 +1,8 @@
 #ifndef slic3r_GUI_PlateSettingsDialog_hpp_
 #define slic3r_GUI_PlateSettingsDialog_hpp_
 
+#include <set>
+
 #include "Plater.hpp"
 #include "PartPlate.hpp"
 #include "Widgets/Button.hpp"
@@ -8,8 +10,11 @@
 #include "Widgets/ComboBox.hpp"
 #include "DragCanvas.hpp"
 #include "libslic3r/ParameterUtils.hpp"
+#include "libslic3r/PrintConfig.hpp"
 
 namespace Slic3r { namespace GUI {
+
+class ConfigOptionsGroup;
 
 wxDECLARE_EVENT(EVT_SET_BED_TYPE_CONFIRM, wxCommandEvent);
 wxDECLARE_EVENT(EVT_NEED_RESORT_LAYERS, wxCommandEvent);
@@ -103,6 +108,14 @@ public:
     void sync_first_layer_print_seq(int selection, const std::vector<int>& seq = std::vector<int>());
     void sync_other_layers_print_seq(int selection, const std::vector<LayerPrintSequence>& seq);
     void sync_spiral_mode(bool spiral_mode, bool as_global);
+    // Seed the per-plate prime tower override section. `global_config` provides
+    // the fallback values; `plate_overrides` lists keys currently overridden on
+    // the plate (and their values). The caller's `plate_overrides` is read via
+    // PartPlate::get_prime_tower_override / has_prime_tower_override.
+    void sync_prime_tower(const DynamicPrintConfig& global_config, const PartPlate& plate);
+
+    const std::set<std::string>& get_prime_tower_overridden_keys() const { return m_prime_tower_overridden_keys; }
+    const DynamicPrintConfig&    get_prime_tower_config() const { return m_prime_tower_config; }
     wxString to_bed_type_name(BedType bed_type);
     wxString to_print_sequence_name(PrintSequence print_seq);
     void on_dpi_changed(const wxRect& suggested_rect) override;
@@ -169,6 +182,17 @@ protected:
     DragCanvas* m_drag_canvas;
     OtherLayersSeqPanel* m_other_layers_seq_panel;
     TextInput *m_ti_plate_name;
+
+    // Per-plate prime tower override section. The transient config holds the
+    // value shown in each field (overrides where present, otherwise global
+    // defaults). m_prime_tower_overridden_keys is the set of keys the user has
+    // actually overridden; only these are written back to the plate on OK.
+    wxStaticBoxSizer*                       m_prime_tower_box{ nullptr };
+    wxScrolledWindow*                       m_prime_tower_panel{ nullptr };
+    std::shared_ptr<ConfigOptionsGroup>     m_prime_tower_optgroup;
+    DynamicPrintConfig                      m_prime_tower_config;
+    DynamicPrintConfig                      m_prime_tower_global_config;
+    std::set<std::string>                   m_prime_tower_overridden_keys;
 };
 
 class PlateNameEditDialog : public DPIDialog

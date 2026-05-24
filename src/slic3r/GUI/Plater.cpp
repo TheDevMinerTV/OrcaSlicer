@@ -17688,6 +17688,11 @@ void Plater::open_platesettings_dialog(wxCommandEvent& evt) {
 
     dlg.sync_spiral_mode(curr_plate->get_spiral_vase_mode(), !curr_plate->has_spiral_mode_config());
 
+    {
+        const DynamicPrintConfig& print_cfg = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+        dlg.sync_prime_tower(print_cfg, *curr_plate);
+    }
+
     dlg.Bind(EVT_SET_BED_TYPE_CONFIRM, [this, plate_index, &dlg](wxCommandEvent& e) {
         PartPlate* curr_plate = p->partplate_list.get_curr_plate();
         BedType old_bed_type = curr_plate->get_bed_type();
@@ -17724,6 +17729,22 @@ void Plater::open_platesettings_dialog(wxCommandEvent& evt) {
         }
         else {
             curr_plate->set_spiral_vase_mode(false, true);
+        }
+
+        // Per-plate prime tower overrides: keys present in the dialog's
+        // overridden-set get written to plate config; everything else gets
+        // erased so the plate falls back to global values.
+        {
+            const auto& overridden = dlg.get_prime_tower_overridden_keys();
+            const DynamicPrintConfig& transient = dlg.get_prime_tower_config();
+            for (const std::string& key : PartPlate::prime_tower_override_keys()) {
+                if (overridden.count(key)) {
+                    const ConfigOption* opt = transient.option(key);
+                    curr_plate->set_prime_tower_override(key, opt ? opt->clone() : nullptr);
+                } else {
+                    curr_plate->set_prime_tower_override(key, nullptr);
+                }
+            }
         }
 
         update_project_dirty_from_presets();
