@@ -3099,7 +3099,23 @@ bool Print::has_wipe_tower() const
         // configured on the printer. Avoids false positives that block slicing
         // (e.g. the variable-layer-height check) when a tower would not actually
         // be generated because only one filament is in use.
-        const auto used = this->extruders();
+        //
+        // NB: do not call Print::extruders() here — it calls has_wipe_tower() to
+        // decide whether to add wipe_tower_filament to the set, which would
+        // recurse and overflow the stack. Compute the used-filament set inline
+        // from the same primitives extruders() uses (object + support extruders
+        // plus any custom-G-code tool-change extruders).
+        std::vector<unsigned int> used = this->object_extruders();
+        append(used, this->support_material_extruders());
+        const int num_filaments = (int) m_config.filament_colour.size();
+        const auto it = m_model.plates_custom_gcodes.find(m_model.curr_plate_index);
+        if (it != m_model.plates_custom_gcodes.end()) {
+            for (const auto& item : it->second.gcodes) {
+                if (item.type == CustomGCode::Type::ToolChange && item.extruder <= num_filaments)
+                    used.push_back((unsigned int)(item.extruder - 1));
+            }
+        }
+        sort_remove_duplicates(used);
         if (!used.empty())
             return used.size() > 1;
 
