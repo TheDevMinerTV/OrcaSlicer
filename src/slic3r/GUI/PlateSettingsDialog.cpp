@@ -9,9 +9,9 @@
 #include "MsgDialog.hpp"
 #include "OptionsGroup.hpp"
 #include "Plater.hpp"
-#include "PresetBundle.hpp"
 #include "Widgets/DialogButtons.hpp"
 #include "Widgets/Label.hpp"
+#include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
 namespace Slic3r { namespace GUI {
