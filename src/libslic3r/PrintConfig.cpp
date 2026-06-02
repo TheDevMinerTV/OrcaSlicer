@@ -2086,32 +2086,47 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Height adaptive slowdown");
     def->category = L("Speed");
     def->tooltip = L("Slow down speed and acceleration as the print gets taller. The scaling is "
-                     "linear between the start and end heights below, and is configured per feature "
-                     "via the height scale settings (100% means no slowdown for that feature).");
-    def->mode = comExpert;
+                     "linear between the start and end heights below. In Advanced mode a single "
+                     "multiplier scales all features; in Expert mode each feature has its own "
+                     "velocity and acceleration scale (100% means no slowdown).");
+    def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("height_adaptive_slowdown_start", coFloat);
     def->label = L("Slowdown start height");
     def->category = L("Speed");
     def->tooltip = L("At or below this Z height the print runs at full speed/acceleration. "
-                     "Above it, speed and acceleration ramp down towards the per-feature scale "
+                     "Above it, speed and acceleration ramp down towards the scale "
                      "reached at the end height.");
     def->sidetext = L("mm");
     def->min = 0;
-    def->mode = comExpert;
+    def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0));
 
     def = this->add("height_adaptive_slowdown_end", coFloat);
     def->label = L("Slowdown end height");
     def->category = L("Speed");
-    def->tooltip = L("At or above this Z height each feature reaches its full height scale "
-                     "(the minimum factor). Must be greater than the start height for slowdown "
-                     "to take effect.");
+    def->tooltip = L("At or above this Z height the scale reaches its full value "
+                     "(the minimum factor). Set to 0 to use the printer's maximum height. "
+                     "Must be greater than the start height for slowdown to take effect.");
     def->sidetext = L("mm");
     def->min = 0;
-    def->mode = comExpert;
+    def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0));
+
+    // ORCA: global "all features" multiplier (Advanced). Combines multiplicatively with the
+    // per-feature scales below (Expert), so 100% here leaves the per-feature scales untouched.
+    def = this->add("height_adaptive_slowdown_scale", coPercent);
+    def->label = L("All features");
+    def->category = L("Speed");
+    def->tooltip = L("Velocity and acceleration scale reached at the end height, applied to every "
+                     "feature. 100% means no slowdown. In Expert mode this multiplies the per-feature "
+                     "scales below.");
+    def->sidetext = L("%");
+    def->min = 5;
+    def->max = 100;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionPercent(100));
 
     auto def_height_scale = [this](const std::string &opt_key, const std::string &label) {
         ConfigOptionDef *d = this->add(opt_key, coPercent);

@@ -1423,6 +1423,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                height_adaptive_slowdown))
     ((ConfigOptionFloat,               height_adaptive_slowdown_start))
     ((ConfigOptionFloat,               height_adaptive_slowdown_end))
+    ((ConfigOptionPercent,             height_adaptive_slowdown_scale))
     ((ConfigOptionPercent,             travel_speed_height_scale))
     ((ConfigOptionPercent,             travel_acceleration_height_scale))
     ((ConfigOptionBool,                silent_mode))

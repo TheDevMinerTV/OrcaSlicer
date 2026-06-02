@@ -1047,7 +1047,7 @@ static std::vector<std::string> s_Preset_print_options{
     "bridge_speed", "internal_bridge_speed", "gap_infill_speed", "travel_speed", "travel_speed_z", "initial_layer_speed",
     "outer_wall_acceleration", "initial_layer_acceleration", "top_surface_acceleration", "default_acceleration", "skirt_type", "skirt_loops", "skirt_speed","min_skirt_length", "skirt_distance", "skirt_start_angle", "skirt_height","single_loop_draft_shield", "draft_shield",
     // ORCA: height-adaptive speed/acceleration slowdown (per-feature)
-    "height_adaptive_slowdown", "height_adaptive_slowdown_start", "height_adaptive_slowdown_end",
+    "height_adaptive_slowdown", "height_adaptive_slowdown_start", "height_adaptive_slowdown_end", "height_adaptive_slowdown_scale",
     "outer_wall_speed_height_scale", "inner_wall_speed_height_scale", "sparse_infill_speed_height_scale",
     "internal_solid_infill_speed_height_scale", "top_surface_speed_height_scale", "gap_infill_speed_height_scale",
     "bridge_speed_height_scale", "support_speed_height_scale", "support_interface_speed_height_scale", "travel_speed_height_scale",

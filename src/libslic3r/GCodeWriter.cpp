@@ -58,6 +58,9 @@ void GCodeWriter::apply_print_config(const PrintConfig &print_config)
     m_max_jerk_z = print_config.machine_max_jerk_z.values.front();
     m_max_jerk_e = print_config.machine_max_jerk_e.values.front();
     m_resolution = print_config.resolution.value;
+    // ORCA: printable_height lives in PrintConfig (not GCodeConfig), cache it for the
+    // height-adaptive travel slowdown so an end height of 0 can ramp to the printer's max Z.
+    m_printable_height = print_config.printable_height.value;
 }
 
 void GCodeWriter::set_extruders(std::vector<unsigned int> extruder_ids)
@@ -602,11 +605,15 @@ double GCodeWriter::height_travel_speed_factor() const
 {
     if (!this->config.height_adaptive_slowdown.value || m_is_first_layer)
         return 1.;
-    const double scale = this->config.travel_speed_height_scale.value;
+    // Combine the per-feature travel scale with the global "all features" multiplier.
+    const double scale = this->config.travel_speed_height_scale.value *
+                         this->config.height_adaptive_slowdown_scale.value / 100.;
     if (scale >= 100.)
         return 1.;
     const double start = this->config.height_adaptive_slowdown_start.value;
-    const double end   = this->config.height_adaptive_slowdown_end.value;
+    double end = this->config.height_adaptive_slowdown_end.value;
+    if (end <= 0.)
+        end = m_printable_height; // 0 => ramp all the way to the printer's max Z
     if (end <= start)
         return 1.;
     const double z = m_pos.z() - m_lifted; // current layer Z, excluding any active z-hop

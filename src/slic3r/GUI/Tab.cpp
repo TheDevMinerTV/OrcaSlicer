@@ -2586,6 +2586,8 @@ void TabPrint::build()
         hheight.append_option(optgroup->get_option("support_interface_speed_height_scale"));
         hheight.append_option(optgroup->get_option("travel_speed_height_scale"));
         optgroup->append_line(hheight);
+        // Global "all features" multiplier (Advanced), sits between the velocity and acceleration rows
+        optgroup->append_single_option_line("height_adaptive_slowdown_scale");
         hheight = { L("Acceleration scale"), L("Per-feature acceleration scale reached at the slowdown end height (100% = no slowdown).") };
         hheight.append_option(optgroup->get_option("outer_wall_acceleration_height_scale"));
         hheight.append_option(optgroup->get_option("inner_wall_acceleration_height_scale"));

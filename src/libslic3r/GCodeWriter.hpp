@@ -178,6 +178,8 @@ public:
 
     // Orca: slicing resolution in mm
     double          m_resolution = 0.01;
+    // ORCA: cached printer max Z (PrintConfig.printable_height) for height-adaptive travel slowdown
+    double          m_printable_height = 0.;
     
     std::string m_gcode_label_objects_start;
     std::string m_gcode_label_objects_end;

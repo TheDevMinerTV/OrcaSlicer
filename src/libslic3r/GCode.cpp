@@ -6321,15 +6321,21 @@ double GCode::calc_max_volumetric_speed(const double layer_height, const double 
 }
 
 // ORCA: Height-adaptive slowdown. Returns a multiplier in (0,1] for the given per-feature scale
-// percentage, interpolated linearly from 1.0 at the start height to scale_percent/100 at the end
-// height. Returns 1.0 (no change) when the feature is disabled, when not slowing down, or on the
-// first layer (which keeps its own dedicated speeds).
+// percentage, interpolated linearly from 1.0 at the start height to the effective scale at the end
+// height. The effective scale combines the per-feature scale with the global "all features"
+// multiplier (height_adaptive_slowdown_scale). Returns 1.0 (no change) when the feature is
+// disabled, when not slowing down, or on the first layer (which keeps its own dedicated speeds).
 double GCode::height_scale_factor(double scale_percent) const
 {
-    if (!m_config.height_adaptive_slowdown.value || scale_percent >= 100. || this->on_first_layer())
+    if (!m_config.height_adaptive_slowdown.value || this->on_first_layer())
+        return 1.;
+    scale_percent = scale_percent * m_config.height_adaptive_slowdown_scale.value / 100.;
+    if (scale_percent >= 100.)
         return 1.;
     const double start = m_config.height_adaptive_slowdown_start.value;
-    const double end   = m_config.height_adaptive_slowdown_end.value;
+    double end = m_config.height_adaptive_slowdown_end.value;
+    if (end <= 0.)
+        end = m_config.printable_height.value; // 0 => ramp all the way to the printer's max Z
     if (end <= start)
         return 1.;
     const double z = m_layer != nullptr ? m_layer->print_z : m_last_layer_z;
