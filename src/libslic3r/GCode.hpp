@@ -249,6 +249,11 @@ public:
     void            set_layer_count(unsigned int value) { m_layer_count = value; }
     void            apply_print_config(const PrintConfig &print_config);
 
+    // ORCA: Height-adaptive slowdown — slow speed/acceleration down as the print gets taller.
+    double          height_scale_factor(double scale_percent) const;
+    double          height_speed_scale_percent(ExtrusionRole role) const;
+    double          height_accel_scale_percent(ExtrusionRole role) const;
+
     std::string     travel_to(const Point& point, ExtrusionRole role, std::string comment, double z = DBL_MAX);
     bool            needs_retraction(const Polyline& travel, ExtrusionRole role, LiftType& lift_type);
     std::string     retract(bool toolchange = false, bool is_last_retraction = false, LiftType lift_type = LiftType::NormalLift, bool apply_instantly = false, ExtrusionRole role = erNone);

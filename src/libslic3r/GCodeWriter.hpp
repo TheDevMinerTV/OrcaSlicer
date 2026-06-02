@@ -129,6 +129,11 @@ public:
 
     // Returns whether this flavor supports separate print and travel acceleration.
     static bool supports_separate_travel_acceleration(GCodeFlavor flavor);
+
+    // ORCA: Height-adaptive slowdown multiplier (in (0,1]) for travel speed, based on the current
+    // Z and the height_adaptive_slowdown_* / travel_speed_height_scale settings. Returns 1.0 when
+    // disabled or on the first layer.
+    double height_travel_speed_factor() const;
   private:
 	// Extruders are sorted by their ID, so that binary search is possible.
     std::vector<Extruder> m_filament_extruders;
@@ -173,6 +178,8 @@ public:
 
     // Orca: slicing resolution in mm
     double          m_resolution = 0.01;
+    // ORCA: cached printer max Z (PrintConfig.printable_height) for height-adaptive travel slowdown
+    double          m_printable_height = 0.;
     
     std::string m_gcode_label_objects_start;
     std::string m_gcode_label_objects_end;
