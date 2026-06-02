@@ -129,6 +129,11 @@ public:
 
     // Returns whether this flavor supports separate print and travel acceleration.
     static bool supports_separate_travel_acceleration(GCodeFlavor flavor);
+
+    // ORCA: Height-adaptive slowdown multiplier (in (0,1]) for travel speed, based on the current
+    // Z and the height_adaptive_slowdown_* / travel_speed_height_scale settings. Returns 1.0 when
+    // disabled or on the first layer.
+    double height_travel_speed_factor() const;
   private:
 	// Extruders are sorted by their ID, so that binary search is possible.
     std::vector<Extruder> m_filament_extruders;

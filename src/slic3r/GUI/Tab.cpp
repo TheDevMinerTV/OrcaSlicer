@@ -2568,6 +2568,37 @@ void TabPrint::build()
         optgroup->append_single_option_line("initial_layer_travel_jerk", "speed_settings_jerk_xy#initial-layer-travel");
         optgroup->append_single_option_line("travel_jerk", "speed_settings_jerk_xy#travel");
 
+        // ORCA: Height-adaptive slowdown — slow speed/acceleration down as the print gets taller
+        optgroup = page->new_optgroup(L("Height adaptive scaling"), L"param_speed", 15);
+        optgroup->append_single_option_line("height_adaptive_slowdown");
+        optgroup->append_single_option_line("height_adaptive_slowdown_start");
+        optgroup->append_single_option_line("height_adaptive_slowdown_end");
+        optgroup->append_separator();
+        Line hheight = { L("Speed scale"), L("Per-feature velocity scale reached at the slowdown end height (100% = no slowdown).") };
+        hheight.append_option(optgroup->get_option("outer_wall_speed_height_scale"));
+        hheight.append_option(optgroup->get_option("inner_wall_speed_height_scale"));
+        hheight.append_option(optgroup->get_option("sparse_infill_speed_height_scale"));
+        hheight.append_option(optgroup->get_option("internal_solid_infill_speed_height_scale"));
+        hheight.append_option(optgroup->get_option("top_surface_speed_height_scale"));
+        hheight.append_option(optgroup->get_option("gap_infill_speed_height_scale"));
+        hheight.append_option(optgroup->get_option("bridge_speed_height_scale"));
+        hheight.append_option(optgroup->get_option("support_speed_height_scale"));
+        hheight.append_option(optgroup->get_option("support_interface_speed_height_scale"));
+        hheight.append_option(optgroup->get_option("travel_speed_height_scale"));
+        optgroup->append_line(hheight);
+        hheight = { L("Acceleration scale"), L("Per-feature acceleration scale reached at the slowdown end height (100% = no slowdown).") };
+        hheight.append_option(optgroup->get_option("outer_wall_acceleration_height_scale"));
+        hheight.append_option(optgroup->get_option("inner_wall_acceleration_height_scale"));
+        hheight.append_option(optgroup->get_option("sparse_infill_acceleration_height_scale"));
+        hheight.append_option(optgroup->get_option("internal_solid_infill_acceleration_height_scale"));
+        hheight.append_option(optgroup->get_option("top_surface_acceleration_height_scale"));
+        hheight.append_option(optgroup->get_option("gap_infill_acceleration_height_scale"));
+        hheight.append_option(optgroup->get_option("bridge_acceleration_height_scale"));
+        hheight.append_option(optgroup->get_option("support_acceleration_height_scale"));
+        hheight.append_option(optgroup->get_option("support_interface_acceleration_height_scale"));
+        hheight.append_option(optgroup->get_option("travel_acceleration_height_scale"));
+        optgroup->append_line(hheight);
+
         optgroup = page->new_optgroup(L("Advanced"), L"param_advanced", 15);
         optgroup->append_single_option_line("max_volumetric_extrusion_rate_slope", "speed_settings_advanced");
         optgroup->append_single_option_line("max_volumetric_extrusion_rate_slope_segment_length", "speed_settings_advanced");

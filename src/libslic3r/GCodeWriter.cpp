@@ -598,6 +598,23 @@ std::string GCodeWriter::set_speed(double F, const std::string &comment, const s
     return w.string();
 }
 
+double GCodeWriter::height_travel_speed_factor() const
+{
+    if (!this->config.height_adaptive_slowdown.value || m_is_first_layer)
+        return 1.;
+    const double scale = this->config.travel_speed_height_scale.value;
+    if (scale >= 100.)
+        return 1.;
+    const double start = this->config.height_adaptive_slowdown_start.value;
+    const double end   = this->config.height_adaptive_slowdown_end.value;
+    if (end <= start)
+        return 1.;
+    const double z = m_pos.z() - m_lifted; // current layer Z, excluding any active z-hop
+    double t = (z - start) / (end - start);
+    t = t < 0. ? 0. : (t > 1. ? 1. : t);
+    return 1. + (scale / 100. - 1.) * t;
+}
+
 std::string GCodeWriter::travel_to_xy(const Vec2d &point, const std::string &comment)
 {
     m_pos(0) = point(0);
@@ -611,6 +628,7 @@ std::string GCodeWriter::travel_to_xy(const Vec2d &point, const std::string &com
     w.emit_xy(point_on_plate);
     auto speed = m_is_first_layer
         ? this->config.get_abs_value("initial_layer_travel_speed") : this->config.travel_speed.value;
+    speed *= this->height_travel_speed_factor(); // ORCA: slow travel down as the print gets taller
     w.emit_f(speed * 60.0);
     //BBS
     w.emit_comment(GCodeWriter::full_gcode_comment, comment);
@@ -697,6 +715,7 @@ std::string GCodeWriter::travel_to_xyz(const Vec3d &point, const std::string &co
     Vec3d dest_point = point;
     auto travel_speed =
         m_is_first_layer ? this->config.get_abs_value("initial_layer_travel_speed") : this->config.travel_speed.value;
+    travel_speed *= this->height_travel_speed_factor(); // ORCA: slow travel down as the print gets taller
     //BBS: a z_hop need to be handle when travel
     if (std::abs(m_to_lift) > EPSILON) {
         assert(std::abs(m_lifted) < EPSILON);
@@ -793,13 +812,13 @@ std::string GCodeWriter::travel_to_xyz(const Vec3d &point, const std::string &co
     {
         //force to move xy first then z after filament change
         w.emit_xy(Vec2d(point_on_plate.x(), point_on_plate.y()));
-        w.emit_f(this->config.travel_speed.value * 60.0);
+        w.emit_f(this->config.travel_speed.value * this->height_travel_speed_factor() * 60.0);
         w.emit_comment(GCodeWriter::full_gcode_comment, comment);
         out_string = w.string() + _travel_to_z(point_on_plate.z(), comment);
     } else {
         GCodeG1Formatter w;
         w.emit_xyz(point_on_plate);
-        w.emit_f(this->config.travel_speed.value * 60.0);
+        w.emit_f(this->config.travel_speed.value * this->height_travel_speed_factor() * 60.0);
         w.emit_comment(GCodeWriter::full_gcode_comment, comment);
         out_string = w.string();
     }

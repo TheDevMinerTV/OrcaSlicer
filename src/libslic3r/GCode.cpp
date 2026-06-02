@@ -6320,6 +6320,67 @@ double GCode::calc_max_volumetric_speed(const double layer_height, const double 
     return res;
 }
 
+// ORCA: Height-adaptive slowdown. Returns a multiplier in (0,1] for the given per-feature scale
+// percentage, interpolated linearly from 1.0 at the start height to scale_percent/100 at the end
+// height. Returns 1.0 (no change) when the feature is disabled, when not slowing down, or on the
+// first layer (which keeps its own dedicated speeds).
+double GCode::height_scale_factor(double scale_percent) const
+{
+    if (!m_config.height_adaptive_slowdown.value || scale_percent >= 100. || this->on_first_layer())
+        return 1.;
+    const double start = m_config.height_adaptive_slowdown_start.value;
+    const double end   = m_config.height_adaptive_slowdown_end.value;
+    if (end <= start)
+        return 1.;
+    const double z = m_layer != nullptr ? m_layer->print_z : m_last_layer_z;
+    double t = (z - start) / (end - start);
+    t = t < 0. ? 0. : (t > 1. ? 1. : t);
+    return Slic3r::lerp(1., scale_percent / 100., t);
+}
+
+// ORCA: Per-feature velocity scale (percent) for the height-adaptive slowdown, mirroring the
+// per-feature speed selection in _extrude(). Roles without a mapping return 100 (no slowdown).
+double GCode::height_speed_scale_percent(ExtrusionRole role) const
+{
+    switch (role) {
+    case erExternalPerimeter:        return m_config.outer_wall_speed_height_scale.value;
+    case erPerimeter:                return m_config.inner_wall_speed_height_scale.value;
+    case erInternalInfill:           return m_config.sparse_infill_speed_height_scale.value;
+    case erSolidInfill:
+    case erBottomSurface:            return m_config.internal_solid_infill_speed_height_scale.value;
+    case erTopSolidInfill:           return m_config.top_surface_speed_height_scale.value;
+    case erGapFill:                  return m_config.gap_infill_speed_height_scale.value;
+    case erBridgeInfill:
+    case erInternalBridgeInfill:
+    case erOverhangPerimeter:
+    case erSupportTransition:        return m_config.bridge_speed_height_scale.value;
+    case erSupportMaterial:          return m_config.support_speed_height_scale.value;
+    case erSupportMaterialInterface: return m_config.support_interface_speed_height_scale.value;
+    default:                         return 100.;
+    }
+}
+
+// ORCA: Per-feature acceleration scale (percent), mirroring the per-feature acceleration selection.
+double GCode::height_accel_scale_percent(ExtrusionRole role) const
+{
+    switch (role) {
+    case erExternalPerimeter:        return m_config.outer_wall_acceleration_height_scale.value;
+    case erPerimeter:                return m_config.inner_wall_acceleration_height_scale.value;
+    case erInternalInfill:           return m_config.sparse_infill_acceleration_height_scale.value;
+    case erSolidInfill:
+    case erBottomSurface:            return m_config.internal_solid_infill_acceleration_height_scale.value;
+    case erTopSolidInfill:           return m_config.top_surface_acceleration_height_scale.value;
+    case erGapFill:                  return m_config.gap_infill_acceleration_height_scale.value;
+    case erBridgeInfill:
+    case erInternalBridgeInfill:
+    case erOverhangPerimeter:
+    case erSupportTransition:        return m_config.bridge_acceleration_height_scale.value;
+    case erSupportMaterial:          return m_config.support_acceleration_height_scale.value;
+    case erSupportMaterialInterface: return m_config.support_interface_acceleration_height_scale.value;
+    default:                         return 100.;
+    }
+}
+
 std::string GCode::_extrude(const ExtrusionPath &path, std::string description, double speed)
 {
     std::string gcode;
@@ -6413,6 +6474,8 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
         } else {
             acceleration = m_config.default_acceleration.value;
         }
+        // ORCA: scale acceleration down as the print gets taller (per-feature)
+        acceleration *= this->height_scale_factor(this->height_accel_scale_percent(path.role()));
         acceleration_i = (unsigned int)floor(acceleration + 0.5);
     }
 
@@ -6538,7 +6601,11 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
 
     if (speed == 0)
         speed = filament_max_volumetric_speed / _mm3_per_mm;
-    
+
+    // ORCA: scale speed down as the print gets taller (per-feature). Applied to the chosen feature
+    // speed so the downstream volumetric/resonance/overhang logic still clamps the scaled value.
+    speed *= this->height_scale_factor(this->height_speed_scale_percent(path.role()));
+
     const auto _layer = layer_id();
     if (this->on_first_layer() || object_layer_over_raft()) {
         //BBS: for solid infill of first layer, speed can be higher as long as
@@ -7382,8 +7449,13 @@ std::string GCode::travel_to(const Point& point, ExtrusionRole role, std::string
                     jerk_to_set = m_config.travel_jerk.value;
             }
         }
+
+        // ORCA: scale travel acceleration down as the print gets taller. The short-travel-on-perimeter
+        // branches above keep using the travel scale (acceptable simplification).
+        acceleration_to_set = (unsigned int) floor(acceleration_to_set *
+            this->height_scale_factor(m_config.travel_acceleration_height_scale.value) + 0.5);
     }
-    
+
     if (m_writer.get_gcode_flavor() == gcfKlipper) {
         gcode += m_writer.set_accel_and_jerk(acceleration_to_set, jerk_to_set);
     } else {

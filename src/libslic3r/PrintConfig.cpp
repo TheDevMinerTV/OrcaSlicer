@@ -2079,6 +2079,74 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(60));
 
+    // ORCA: Height-adaptive speed/acceleration scaling. Slow the print down as it gets taller
+    // (more gantry/part leverage near the top -> more ringing). Gated by height_adaptive_slowdown;
+    // each feature has an independent velocity and acceleration scale (100% = no change).
+    def = this->add("height_adaptive_slowdown", coBool);
+    def->label = L("Height adaptive slowdown");
+    def->category = L("Speed");
+    def->tooltip = L("Slow down speed and acceleration as the print gets taller. The scaling is "
+                     "linear between the start and end heights below, and is configured per feature "
+                     "via the height scale settings (100% means no slowdown for that feature).");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("height_adaptive_slowdown_start", coFloat);
+    def->label = L("Slowdown start height");
+    def->category = L("Speed");
+    def->tooltip = L("At or below this Z height the print runs at full speed/acceleration. "
+                     "Above it, speed and acceleration ramp down towards the per-feature scale "
+                     "reached at the end height.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("height_adaptive_slowdown_end", coFloat);
+    def->label = L("Slowdown end height");
+    def->category = L("Speed");
+    def->tooltip = L("At or above this Z height each feature reaches its full height scale "
+                     "(the minimum factor). Must be greater than the start height for slowdown "
+                     "to take effect.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0));
+
+    auto def_height_scale = [this](const std::string &opt_key, const std::string &label) {
+        ConfigOptionDef *d = this->add(opt_key, coPercent);
+        d->label = label;
+        d->category = L("Speed");
+        d->tooltip = L("Factor applied to this feature at the slowdown end height (and interpolated "
+                       "linearly from 100% at the start height). 100% disables the slowdown for this feature.");
+        d->sidetext = L("%");
+        d->min = 5;
+        d->max = 100;
+        d->mode = comExpert;
+        d->set_default_value(new ConfigOptionPercent(100));
+        return d;
+    };
+    def_height_scale("outer_wall_speed_height_scale",            L("Outer wall speed scale"));
+    def_height_scale("inner_wall_speed_height_scale",            L("Inner wall speed scale"));
+    def_height_scale("sparse_infill_speed_height_scale",         L("Sparse infill speed scale"));
+    def_height_scale("internal_solid_infill_speed_height_scale", L("Internal solid infill speed scale"));
+    def_height_scale("top_surface_speed_height_scale",           L("Top surface speed scale"));
+    def_height_scale("gap_infill_speed_height_scale",            L("Gap infill speed scale"));
+    def_height_scale("bridge_speed_height_scale",                L("Bridge speed scale"));
+    def_height_scale("support_speed_height_scale",               L("Support speed scale"));
+    def_height_scale("support_interface_speed_height_scale",     L("Support interface speed scale"));
+    def_height_scale("travel_speed_height_scale",                L("Travel speed scale"));
+    def_height_scale("outer_wall_acceleration_height_scale",            L("Outer wall acceleration scale"));
+    def_height_scale("inner_wall_acceleration_height_scale",            L("Inner wall acceleration scale"));
+    def_height_scale("sparse_infill_acceleration_height_scale",         L("Sparse infill acceleration scale"));
+    def_height_scale("internal_solid_infill_acceleration_height_scale", L("Internal solid infill acceleration scale"));
+    def_height_scale("top_surface_acceleration_height_scale",           L("Top surface acceleration scale"));
+    def_height_scale("gap_infill_acceleration_height_scale",            L("Gap infill acceleration scale"));
+    def_height_scale("bridge_acceleration_height_scale",                L("Bridge acceleration scale"));
+    def_height_scale("support_acceleration_height_scale",               L("Support acceleration scale"));
+    def_height_scale("support_interface_acceleration_height_scale",     L("Support interface acceleration scale"));
+    def_height_scale("travel_acceleration_height_scale",                L("Travel acceleration scale"));
+
     def = this->add("small_perimeter_speed", coFloatOrPercent);
     def->label = L("Small perimeters");
     def->category = L("Speed");
