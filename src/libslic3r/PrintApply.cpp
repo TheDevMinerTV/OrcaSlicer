@@ -757,8 +757,29 @@ static std::optional<PrintRegionConfig> shell_material_region_config(const Print
     cfg.sparse_infill_density.value = parent_config.shell_material_sparse_infill_density.value < 0.00011 ?
         0. : std::min(parent_config.shell_material_sparse_infill_density.value, 100.);
     cfg.sparse_infill_pattern.value = parent_config.shell_material_sparse_infill_pattern.value;
-    if (parent_config.shell_material_wall_loops.value >= 0)
+    // The interface wall count also limits the shell's own walls at the material interface. The extra walls of the
+    // outer surface are printed by a separate strip region (see shell_material_surface_region_config()).
+    const int shell_walls     = parent_config.shell_material_wall_loops.value >= 0 ? parent_config.shell_material_wall_loops.value : parent_config.wall_loops.value;
+    const int interface_walls = parent_config.shell_material_interface_wall_loops.value;
+    if (interface_walls >= 0 && interface_walls < shell_walls)
+        cfg.wall_loops.value = interface_walls;
+    else if (parent_config.shell_material_wall_loops.value >= 0)
         cfg.wall_loops.value = parent_config.shell_material_wall_loops.value;
+    return cfg;
+}
+
+// Config of the outer-surface strip of the shell material region: a band along the object surface just wide enough
+// to hold the walls the shell's interface side does not print (shell walls minus interface walls). Returns
+// std::nullopt when no strip is needed.
+static std::optional<PrintRegionConfig> shell_material_surface_region_config(const PrintRegionConfig &parent_config, const size_t num_extruders)
+{
+    const int shell_walls     = parent_config.shell_material_wall_loops.value >= 0 ? parent_config.shell_material_wall_loops.value : parent_config.wall_loops.value;
+    const int interface_walls = parent_config.shell_material_interface_wall_loops.value;
+    if (interface_walls < 0 || interface_walls >= shell_walls)
+        return std::nullopt;
+    std::optional<PrintRegionConfig> cfg = shell_material_region_config(parent_config, num_extruders);
+    if (cfg)
+        cfg->wall_loops.value = shell_walls - interface_walls;
     return cfg;
 }
 
@@ -940,7 +961,8 @@ bool verify_update_print_object_regions(
             return true;
         };
         if (! verify_variant(layer_range.shell_material_regions, shell_material_region_config) ||
-            ! verify_variant(layer_range.shell_material_core_regions, shell_material_core_region_config))
+            ! verify_variant(layer_range.shell_material_core_regions, shell_material_core_region_config) ||
+            ! verify_variant(layer_range.shell_material_surface_regions, shell_material_surface_region_config))
             return false;
     }
 
@@ -1074,6 +1096,7 @@ static PrintObjectRegions* generate_print_object_regions(
             r.fuzzy_skin_painted_regions.clear();
             r.shell_material_regions.clear();
             r.shell_material_core_regions.clear();
+            r.shell_material_surface_regions.clear();
         }
     } else {
         out->trafo_bboxes = trafo;
@@ -1205,6 +1228,8 @@ static PrintObjectRegions* generate_print_object_regions(
                     layer_range.shell_material_regions.push_back({ parent_region_id, get_create_region(std::move(*cfg)) });
                 if (std::optional<PrintRegionConfig> cfg = shell_material_core_region_config(parent_region.region->config(), num_extruders); cfg)
                     layer_range.shell_material_core_regions.push_back({ parent_region_id, get_create_region(std::move(*cfg)) });
+                if (std::optional<PrintRegionConfig> cfg = shell_material_surface_region_config(parent_region.region->config(), num_extruders); cfg)
+                    layer_range.shell_material_surface_regions.push_back({ parent_region_id, get_create_region(std::move(*cfg)) });
             }
         // Sort the regions by parent region::print_object_region_id() to help the slicing algorithm when applying shell material segmentation.
         auto by_parent_region_id = [&layer_range](auto &l, auto &r) {
@@ -1212,6 +1237,7 @@ static PrintObjectRegions* generate_print_object_regions(
                    layer_range.volume_regions[r.parent].region->print_object_region_id(); };
         std::sort(layer_range.shell_material_regions.begin(), layer_range.shell_material_regions.end(), by_parent_region_id);
         std::sort(layer_range.shell_material_core_regions.begin(), layer_range.shell_material_core_regions.end(), by_parent_region_id);
+        std::sort(layer_range.shell_material_surface_regions.begin(), layer_range.shell_material_surface_regions.end(), by_parent_region_id);
     }
 
     return out.release();

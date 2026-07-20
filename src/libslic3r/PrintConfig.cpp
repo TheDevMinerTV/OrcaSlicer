@@ -3485,8 +3485,9 @@ void PrintConfigDef::init_fff_params()
     def = this->add("shell_material_wall_loops", coInt);
     def->label = L("Shell material walls");
     def->category = L("Strength");
-    def->tooltip = L("Number of walls of the shell material region. This applies to both the outer surface and the "
-                     "interface towards the core.\n-1 uses the object's wall count.");
+    def->tooltip = L("Number of walls of the shell material at the outer surface of the object. The shell's side "
+                     "towards the core prints \"Shell material interface walls\" instead, when that is set.\n"
+                     "-1 uses the object's wall count.");
     def->min = -1;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionInt(-1));
@@ -3494,11 +3495,11 @@ void PrintConfigDef::init_fff_params()
     def = this->add("shell_material_interface_wall_loops", coInt);
     def->label = L("Shell material interface walls");
     def->category = L("Strength");
-    def->tooltip = L("Number of walls the core prints where it interfaces the shell material. Lower values leave more "
-                     "room for infill at the material boundary; 0 puts the core's infill directly against the shell.\n"
-                     "-1 uses the object's wall count.\n"
-                     "Not applied when paint scopes the shell (Automatic scope with painted areas): the painted "
-                     "core merges into the object's regular walls there.");
+    def->tooltip = L("Number of walls printed on both sides of the interface between the shell material and the "
+                     "core. Lower values leave more room for infill at the material boundary; 0 puts infill directly "
+                     "against the other material.\n-1 uses the object's wall count.\n"
+                     "The core side is not affected when paint scopes the shell (Automatic scope with painted areas): "
+                     "the painted core merges into the object's regular walls there.");
     def->min = -1;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionInt(-1));

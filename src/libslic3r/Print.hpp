@@ -306,6 +306,10 @@ public:
         // Core-side companions of shell_material_regions: they take over the core (the remainder after the shell
         // band is stolen) when shell_material_interface_wall_loops overrides the core's wall count at the interface.
         std::vector<ShellMaterialRegion>    shell_material_core_regions;
+        // Outer-surface companions of shell_material_regions: a thin strip along the object surface holding the
+        // extra walls (shell walls minus interface walls), so the shell's interface side can print fewer walls
+        // than its outer surface.
+        std::vector<ShellMaterialRegion>    shell_material_surface_regions;
 
         bool has_volume(const ObjectID id) const {
             auto it = lower_bound_by_predicate(this->volumes.begin(), this->volumes.end(), [id](const VolumeExtents &l) { return l.volume_id < id; });

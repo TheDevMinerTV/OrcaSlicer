@@ -386,8 +386,9 @@ TEST_CASE("Shell can be limited to the sides", "[ShellMaterial]")
     }
 }
 
-// Wall count overrides: the shell region gets shell_material_wall_loops; the core moves into a
-// dedicated region whose wall count at the material interface is shell_material_interface_wall_loops.
+// Wall count overrides: the shell's outer surface prints shell_material_wall_loops via a dedicated
+// wall strip region, while both sides of the material interface print shell_material_interface_wall_loops
+// (the shell's inner region and a dedicated core-side region).
 TEST_CASE("Shell and interface wall counts are adjustable", "[ShellMaterial]")
 {
     Print print;
@@ -408,12 +409,18 @@ TEST_CASE("Shell and interface wall counts are adjustable", "[ShellMaterial]")
     const PrintObject &object = *print.objects().front();
     REQUIRE_FALSE(object.layers().empty());
 
+    // The outer wall strip holds the 3 surface walls; with the default nozzle diameter of 0.4mm and
+    // "auto" line widths it is 3 x 0.4 = 1.2mm wide: a 20x20 ring of 400 - 17.6^2 = 90.24mm2.
+    const double strip_area = 400. - 17.6 * 17.6;
+
     for (const Layer *layer : object.layers()) {
-        const LayerRegion *parent = nullptr, *core = nullptr, *shell = nullptr;
+        const LayerRegion *parent = nullptr, *core = nullptr, *shell_inner = nullptr, *shell_surface = nullptr;
         for (const LayerRegion *layerm : layer->regions()) {
             const PrintRegionConfig &cfg = layerm->region().config();
-            if (cfg.outer_wall_filament_id == 2)
-                shell = layerm;
+            if (cfg.outer_wall_filament_id == 2 && cfg.wall_loops == 3)
+                shell_surface = layerm;
+            else if (cfg.outer_wall_filament_id == 2)
+                shell_inner = layerm;
             else if (cfg.wall_loops == 0)
                 core = layerm;
             else
@@ -421,18 +428,21 @@ TEST_CASE("Shell and interface wall counts are adjustable", "[ShellMaterial]")
         }
         REQUIRE(parent != nullptr);
         REQUIRE(core != nullptr);
-        REQUIRE(shell != nullptr);
-        CHECK(shell->region().config().wall_loops == 3);
+        REQUIRE(shell_inner != nullptr);
+        REQUIRE(shell_surface != nullptr);
+        // The interface wall count applies to the shell's side of the interface as well.
+        CHECK(shell_inner->region().config().wall_loops == 0);
 
         INFO("print_z " << layer->print_z);
         // The parent region is fully replaced by the shell band and the core-side region.
         CHECK(slices_area_mm2(*parent) == 0.);
+        CHECK_THAT(slices_area_mm2(*shell_surface), WithinRel(strip_area, 0.02));
         if (layer->bottom_z() < 2. - EPSILON || layer->print_z > 18. + EPSILON) {
             CHECK(slices_area_mm2(*core) == 0.);
-            CHECK_THAT(slices_area_mm2(*shell), WithinRel(400., 0.02));
+            CHECK_THAT(slices_area_mm2(*shell_inner), WithinRel(400. - strip_area, 0.02));
         } else {
             CHECK_THAT(slices_area_mm2(*core), WithinRel(256., 0.02));
-            CHECK_THAT(slices_area_mm2(*shell), WithinRel(144., 0.02));
+            CHECK_THAT(slices_area_mm2(*shell_inner), WithinRel(144. - strip_area, 0.03));
         }
     }
 }

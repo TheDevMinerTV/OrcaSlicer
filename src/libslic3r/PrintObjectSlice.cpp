@@ -1152,6 +1152,19 @@ static void apply_shell_material_segmentation(PrintObject &print_object, ThrowOn
     if (num_layers == 0)
         return;
 
+    // Width of the outer-surface wall strip of a shell material surface region (see
+    // shell_material_surface_region_config()): just enough room for its wall count.
+    const double nozzle_diameter = print_object.print()->config().nozzle_diameter.get_at(0);
+    auto strip_width = [nozzle_diameter](const PrintRegionConfig &cfg) -> double {
+        double width_external = cfg.get_abs_value("outer_wall_line_width", nozzle_diameter);
+        if (width_external < EPSILON)
+            width_external = nozzle_diameter;
+        double width_internal = cfg.get_abs_value("inner_wall_line_width", nozzle_diameter);
+        if (width_internal < EPSILON)
+            width_internal = nozzle_diameter;
+        return width_external + (cfg.wall_loops.value - 1) * width_internal;
+    };
+
     // Distinct band shapes: thickness and whether the shell also covers the top/bottom of the object
     // (per-region config, usually a single combination).
     std::vector<std::pair<double, bool>> band_specs;
@@ -1217,13 +1230,32 @@ static void apply_shell_material_segmentation(PrintObject &print_object, ThrowOn
         });
     }
 
+    // Outer-surface wall strips, per strip width.
+    std::vector<double> strip_widths;
+    for (const PrintObjectRegions::LayerRangeRegions &layer_range : print_object.shared_regions()->layer_ranges)
+        for (const PrintObjectRegions::ShellMaterialRegion &surface_region : layer_range.shell_material_surface_regions)
+            strip_widths.emplace_back(strip_width(surface_region.region->config()));
+    sort_remove_duplicates(strip_widths);
+    std::map<double, std::vector<ExPolygons>> strips;
+    for (const double width : strip_widths) {
+        std::vector<ExPolygons> &strip = strips[width];
+        strip.assign(num_layers, ExPolygons());
+        tbb::parallel_for(tbb::blocked_range<int>(0, num_layers), [&merged, &strip, width, throw_on_cancel](const tbb::blocked_range<int> &range) {
+            for (int layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
+                throw_on_cancel();
+                if (! merged[layer_idx].empty())
+                    strip[layer_idx] = diff_ex(merged[layer_idx], offset_ex(merged[layer_idx], -float(scale_(width))));
+            }
+        });
+    }
+
     struct ByRegion
     {
         ExPolygons expolygons;
         bool       needs_merge { false };
     };
 
-    tbb::parallel_for(tbb::blocked_range<int>(0, num_layers, std::max(num_layers / 128, 1)), [&print_object, &bands, throw_on_cancel](const tbb::blocked_range<int> &range) {
+    tbb::parallel_for(tbb::blocked_range<int>(0, num_layers, std::max(num_layers / 128, 1)), [&print_object, &bands, &strips, &strip_width, throw_on_cancel](const tbb::blocked_range<int> &range) {
         const auto &layer_ranges   = print_object.shared_regions()->layer_ranges;
         auto        it_layer_range = layer_range_first(layer_ranges, print_object.get_layer(int(range.begin()))->slice_z);
         const PrintObjectRegions::LayerRangeRegions *cached_layer_range = nullptr;
@@ -1232,6 +1264,10 @@ static void apply_shell_material_segmentation(PrintObject &print_object, ThrowOn
         // Maps print_object_region_id -> print_object_region_id of the core-side region taking over the remainder
         // (shell_material_interface_wall_loops override), -1 to leave the remainder in the source region.
         std::vector<int> core_target;
+        // Maps a shell region's print_object_region_id -> its outer-surface strip region (-1 for none) and the
+        // strip width to peel off the stolen band.
+        std::vector<int>    surface_of;
+        std::vector<double> surface_width_of;
 
         for (int layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
             throw_on_cancel();
@@ -1247,6 +1283,8 @@ static void apply_shell_material_segmentation(PrintObject &print_object, ThrowOn
                 const size_t num_filaments = print_object.print()->config().filament_diameter.size();
                 target.assign(layer.region_count(), -1);
                 core_target.assign(layer.region_count(), -1);
+                surface_of.assign(layer.region_count(), -1);
+                surface_width_of.assign(layer.region_count(), 0.);
                 // Parents whose shell is scoped by color painting with the shell filament.
                 std::vector<bool> parent_masked(layer.region_count(), false);
                 for (const PrintObjectRegions::ShellMaterialRegion &shell_region : layer_range.shell_material_regions) {
@@ -1261,6 +1299,16 @@ static void apply_shell_material_segmentation(PrintObject &print_object, ThrowOn
                     for (const PrintObjectRegions::ShellMaterialRegion &core_region : layer_range.shell_material_core_regions)
                         if (layer_range.volume_regions[core_region.parent].region == parent && core_region.region != parent) {
                             core_id = core_region.region->print_object_region_id();
+                            break;
+                        }
+                    // The outer-surface strip region of this parent, if any: it takes over the outermost part of
+                    // the band so the shell prints its full wall count at the surface but only the interface wall
+                    // count towards the core.
+                    for (const PrintObjectRegions::ShellMaterialRegion &surface_region : layer_range.shell_material_surface_regions)
+                        if (layer_range.volume_regions[surface_region.parent].region == parent && surface_region.region != parent &&
+                            surface_region.region->print_object_region_id() != shell_id) {
+                            surface_of[shell_id]       = surface_region.region->print_object_region_id();
+                            surface_width_of[shell_id] = strip_width(surface_region.region->config());
                             break;
                         }
                     // Color painting with the shell filament scopes the shell ("paint-on shell"): when such painted
@@ -1348,6 +1396,21 @@ static void apply_shell_material_segmentation(PrintObject &print_object, ThrowOn
                     } else {
                         append(dst.expolygons, union_ex(remaining));
                         dst.needs_merge = true;
+                    }
+                }
+
+                // Peel the outer-surface wall strip off the stolen band.
+                if (const int surface_region_id = surface_of[target_region_id]; surface_region_id >= 0 && ! stolen.empty()) {
+                    const ExPolygons &strip = strips.at(surface_width_of[target_region_id])[layer_idx];
+                    if (ExPolygons stolen_surface = intersection_ex(stolen, strip); ! stolen_surface.empty()) {
+                        stolen = diff_ex(stolen, strip);
+                        ByRegion &dst = by_region[surface_region_id];
+                        if (dst.expolygons.empty()) {
+                            dst.expolygons = std::move(stolen_surface);
+                        } else {
+                            append(dst.expolygons, std::move(stolen_surface));
+                            dst.needs_merge = true;
+                        }
                     }
                 }
 
