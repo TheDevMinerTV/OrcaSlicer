@@ -277,6 +277,16 @@ public:
         int          parent_print_object_region_id(const LayerRangeRegions &layer_range) const;
     };
 
+    // Region printing the outer N mm of the object with a different filament ("shell material").
+    // Generated from the config (shell_material_filament_id / shell_material_thickness), not from painted facets.
+    struct ShellMaterialRegion
+    {
+        // Index of a parent VolumeRegion.
+        int          parent { -1 };
+        // Pointer to PrintObjectRegions::all_regions.
+        PrintRegion *region { nullptr };
+    };
+
     // One slice over the PrintObject (possibly the whole PrintObject) and a list of ModelVolumes and their bounding boxes
     // possibly clipped by the layer_height_range.
     struct LayerRangeRegions
@@ -292,6 +302,10 @@ public:
         std::vector<VolumeRegion>           volume_regions;
         std::vector<PaintedRegion>          painted_regions;
         std::vector<FuzzySkinPaintedRegion> fuzzy_skin_painted_regions;
+        std::vector<ShellMaterialRegion>    shell_material_regions;
+        // Core-side companions of shell_material_regions: they take over the core (the remainder after the shell
+        // band is stolen) when shell_material_interface_wall_loops overrides the core's wall count at the interface.
+        std::vector<ShellMaterialRegion>    shell_material_core_regions;
 
         bool has_volume(const ObjectID id) const {
             auto it = lower_bound_by_predicate(this->volumes.begin(), this->volumes.end(), [id](const VolumeExtents &l) { return l.volume_id < id; });

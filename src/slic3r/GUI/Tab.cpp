@@ -3014,6 +3014,16 @@ void TabPrint::build()
         optgroup->append_single_option_line("bottom_surface_filament_id", "multimaterial_settings_filament_for_features#bottom-surface");
         optgroup->append_single_option_line("wipe_tower_filament", "multimaterial_settings_filament_for_features#wipe-tower");
 
+        optgroup = page->new_optgroup(L("Shell material"), L"param_filament_for_features");
+        optgroup->append_single_option_line("shell_material_filament_id");
+        optgroup->append_single_option_line("shell_material_thickness");
+        optgroup->append_single_option_line("shell_material_scope");
+        optgroup->append_single_option_line("shell_material_top_and_bottom");
+        optgroup->append_single_option_line("shell_material_sparse_infill_density");
+        optgroup->append_single_option_line("shell_material_sparse_infill_pattern");
+        optgroup->append_single_option_line("shell_material_wall_loops");
+        optgroup->append_single_option_line("shell_material_interface_wall_loops");
+
         optgroup = page->new_optgroup(L("Ooze prevention"), L"param_ooze_prevention");
         optgroup->append_single_option_line("ooze_prevention", "multimaterial_settings_ooze_prevention");
         optgroup->append_single_option_line("standby_temperature_delta", "multimaterial_settings_ooze_prevention#temperature-variation");
