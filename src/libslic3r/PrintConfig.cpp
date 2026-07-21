@@ -278,6 +278,12 @@ static t_config_enum_values s_keys_map_InfillPattern {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(InfillPattern)
 
+static t_config_enum_values s_keys_map_ShellMaterialScope {
+    { "auto",         int(ShellMaterialScope::Auto) },
+    { "whole_object", int(ShellMaterialScope::WholeObject) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(ShellMaterialScope)
+
 static t_config_enum_values s_keys_map_IroningType {
     { "no ironing",     int(IroningType::NoIroning) },
     { "top",            int(IroningType::TopSurfaces) },
@@ -3431,6 +3437,104 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Archimedean Chords"));
     def->enum_labels.push_back(L("Octagram Spiral"));
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipCrossHatch));
+
+    // Shell material: print the outer N mm of the object in a different filament with its own sparse infill.
+    def = this->add("shell_material_filament_id", coInt);
+    def->gui_type = ConfigOptionDef::GUIType::i_enum_open;
+    def->label = L("Shell material");
+    def->category = L("Extruders");
+    def->tooltip = L("Filament to print the outer shell of the object (the outermost N millimeters, see \"Shell material thickness\").\n"
+                     "If some areas of the object are color-painted with this filament, the shell is applied only there "
+                     "(paint-on shell); areas painted with other filaments always keep their paint.\n"
+                     "\"Default\" disables the feature: the whole object is printed with its regular filament.");
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(0));
+
+    def = this->add("shell_material_thickness", coFloat);
+    def->label = L("Shell material thickness");
+    def->category = L("Strength");
+    def->tooltip = L("Thickness of the shell printed with the shell material filament, measured horizontally and vertically "
+                     "from the object surface. Regions deeper inside the object are printed normally.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(2.));
+
+    def = this->add("shell_material_sparse_infill_density", coPercent);
+    def->label = L("Shell material infill density");
+    def->category = L("Strength");
+    // xgettext:no-c-format, no-boost-format
+    def->tooltip = L("Density of sparse infill inside the shell material region.");
+    def->sidetext = "%";
+    def->min = 0;
+    def->max = 100;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionPercent(15));
+
+    def = this->add("shell_material_sparse_infill_pattern", coEnum);
+    def->label = L("Shell material infill pattern");
+    def->category = L("Strength");
+    def->tooltip = L("Line pattern of sparse infill inside the shell material region.");
+    def->enum_keys_map = &ConfigOptionEnum<InfillPattern>::get_enum_values();
+    def->enum_values = this->get("sparse_infill_pattern")->enum_values;
+    def->enum_labels = this->get("sparse_infill_pattern")->enum_labels;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipGrid));
+
+    def = this->add("shell_material_wall_loops", coInt);
+    def->label = L("Shell material walls");
+    def->category = L("Strength");
+    def->tooltip = L("Number of walls of the shell material at the outer surface of the object. The shell's side "
+                     "towards the core prints \"Shell material interface walls\" instead, when that is set.\n"
+                     "-1 uses the object's wall count.");
+    def->min = -1;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(-1));
+
+    def = this->add("shell_material_interface_wall_loops", coInt);
+    def->label = L("Shell material interface walls");
+    def->category = L("Strength");
+    def->tooltip = L("Number of walls printed on both sides of the interface between the shell material and the "
+                     "core. Lower values leave more room for infill at the material boundary; 0 puts infill directly "
+                     "against the other material.\n-1 uses the object's wall count.\n"
+                     "The core side is not affected when paint scopes the shell (Automatic scope with painted areas): "
+                     "the painted core merges into the object's regular walls there.");
+    def->min = -1;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(-1));
+
+    def = this->add("shell_material_top", coBool);
+    def->label = L("Shell material on top");
+    def->category = L("Strength");
+    def->tooltip = L("When enabled, the topmost N millimeters of the object (and areas near top surfaces) also print "
+                     "in the shell material. When disabled, top faces keep the core material.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("shell_material_bottom", coBool);
+    def->label = L("Shell material on bottom");
+    def->category = L("Strength");
+    def->tooltip = L("When enabled, the bottommost N millimeters of the object (and areas near bottom surfaces) also "
+                     "print in the shell material. When disabled, bottom faces keep the core material.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("shell_material_scope", coEnum);
+    def->label = L("Shell material scope");
+    def->category = L("Strength");
+    def->tooltip = L("Where the shell material is applied.\n"
+                     "Automatic: if some areas are color-painted with the shell filament, only those areas are "
+                     "shelled; otherwise the whole object.\n"
+                     "Whole object: the shell always wraps the entire outer surface. Paint with the shell filament "
+                     "merges into the shell instead of limiting it, keeping a single continuous core.");
+    def->enum_keys_map = &ConfigOptionEnum<ShellMaterialScope>::get_enum_values();
+    def->enum_values.push_back("auto");
+    def->enum_values.push_back("whole_object");
+    def->enum_labels.push_back(L("Automatic"));
+    def->enum_labels.push_back(L("Whole object"));
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<ShellMaterialScope>(ShellMaterialScope::Auto));
 
     def = this->add("top_surface_acceleration", coFloats);
     def->label = L("Top surface");

@@ -70,6 +70,14 @@ enum class FuzzySkinMode {
     Combined,
 };
 
+// Where the shell material band is applied.
+enum class ShellMaterialScope {
+    // Areas color-painted with the shell filament when such paint exists, the whole object otherwise.
+    Auto,
+    // Always the whole object; paint with the shell filament merges into the shell instead of masking it.
+    WholeObject,
+};
+
 // ORCA: direction in which top_surface_expansion grows the top surfaces.
 enum class TopSurfaceExpansionDirection {
     InwardAndOutward,
@@ -639,6 +647,7 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(PrinterTechnology)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(GCodeFlavor)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(FuzzySkinType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(FuzzySkinMode)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(ShellMaterialScope)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(TopSurfaceExpansionDirection)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(WipeTowerType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(NoiseType)
@@ -1316,6 +1325,16 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatsNullable, filament_ironing_spacing))
     ((ConfigOptionFloatsNullable, filament_ironing_inset))
     ((ConfigOptionFloatsNullable, filament_ironing_speed))
+    // Shell material: print the outer N mm of the object in a different filament with its own sparse infill.
+    ((ConfigOptionInt,                 shell_material_filament_id))
+    ((ConfigOptionFloat,               shell_material_thickness))
+    ((ConfigOptionPercent,             shell_material_sparse_infill_density))
+    ((ConfigOptionEnum<InfillPattern>, shell_material_sparse_infill_pattern))
+    ((ConfigOptionInt,                 shell_material_wall_loops))
+    ((ConfigOptionInt,                 shell_material_interface_wall_loops))
+    ((ConfigOptionBool,                shell_material_top))
+    ((ConfigOptionBool,                shell_material_bottom))
+    ((ConfigOptionEnum<ShellMaterialScope>, shell_material_scope))
     // Detect bridging perimeters
     ((ConfigOptionBool, detect_overhang_wall))
     ((ConfigOptionInt, outer_wall_filament_id))

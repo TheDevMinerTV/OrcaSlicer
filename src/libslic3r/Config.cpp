@@ -1513,13 +1513,15 @@ std::optional<PluginCapabilityRef> parse_capability_ref(const std::string& value
 }
 
 //BBS: add json support
-void ConfigBase::save_to_json(const std::string &file, const std::string &name, const std::string &from, const std::string &version) const
+void ConfigBase::save_to_json(const std::string &file, const std::string &name, const std::string &from, const std::string &version, const std::string &type) const
 {
     json j;
     //record the headers
     j[BBL_JSON_KEY_VERSION] = version;
     j[BBL_JSON_KEY_NAME] = name;
     j[BBL_JSON_KEY_FROM] = from;
+    if (!type.empty())
+        j[BBL_JSON_KEY_TYPE] = type;
 
     //record all the key-values
     for (const std::string &opt_key : this->keys())
