@@ -1167,11 +1167,11 @@ static void apply_shell_material_segmentation(PrintObject &print_object, ThrowOn
 
     // Distinct band shapes: thickness and whether the shell also covers the top/bottom of the object
     // (per-region config, usually a single combination).
-    std::vector<std::pair<double, bool>> band_specs;
+    std::vector<std::tuple<double, bool, bool>> band_specs;
     for (const PrintObjectRegions::LayerRangeRegions &layer_range : print_object.shared_regions()->layer_ranges)
         for (const PrintObjectRegions::ShellMaterialRegion &shell_region : layer_range.shell_material_regions)
             if (const PrintRegionConfig &cfg = shell_region.region->config(); cfg.shell_material_thickness.value > 0.)
-                band_specs.emplace_back(cfg.shell_material_thickness.value, cfg.shell_material_top_and_bottom.value);
+                band_specs.emplace_back(cfg.shell_material_thickness.value, cfg.shell_material_top.value, cfg.shell_material_bottom.value);
     sort_remove_duplicates(band_specs);
     if (band_specs.empty())
         return;
@@ -1188,10 +1188,10 @@ static void apply_shell_material_segmentation(PrintObject &print_object, ThrowOn
     });
 
     // Shell band of every layer, per band shape.
-    std::map<std::pair<double, bool>, std::vector<ExPolygons>> bands;
+    std::map<std::tuple<double, bool, bool>, std::vector<ExPolygons>> bands;
     const double z_top    = print_object.layers().back()->print_z;
     const double z_bottom = print_object.layers().front()->bottom_z();
-    for (const auto &[thickness, include_top_bottom] : band_specs) {
+    for (const auto &[thickness, include_top, include_bottom] : band_specs) {
         std::vector<ExPolygons> eroded(num_layers);
         tbb::parallel_for(tbb::blocked_range<int>(0, num_layers), [&merged, &eroded, thickness = thickness, throw_on_cancel](const tbb::blocked_range<int> &range) {
             for (int layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
@@ -1200,30 +1200,34 @@ static void apply_shell_material_segmentation(PrintObject &print_object, ThrowOn
             }
         });
 
-        std::vector<ExPolygons> &band = bands[{thickness, include_top_bottom}];
+        std::vector<ExPolygons> &band = bands[{thickness, include_top, include_bottom}];
         band.assign(num_layers, ExPolygons());
-        tbb::parallel_for(tbb::blocked_range<int>(0, num_layers), [&print_object, &merged, &eroded, &band, thickness = thickness, include_top_bottom = include_top_bottom, z_top, z_bottom, num_layers, throw_on_cancel](const tbb::blocked_range<int> &range) {
+        tbb::parallel_for(tbb::blocked_range<int>(0, num_layers), [&print_object, &merged, &eroded, &band, thickness = thickness, include_top = include_top, include_bottom = include_bottom, z_top, z_bottom, num_layers, throw_on_cancel](const tbb::blocked_range<int> &range) {
             for (int layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
                 throw_on_cancel();
                 if (merged[layer_idx].empty())
                     continue;
                 const Layer &layer = *print_object.get_layer(layer_idx);
                 ExPolygons   core;
-                if (! include_top_bottom) {
-                    // Side band only: pure XY erosion, the top/bottom faces keep the core material.
+                // Proximity to top surfaces is detected by the upward window walk, to bottom surfaces by the
+                // downward walk; each runs only when the respective side is shelled. A disabled side keeps the
+                // core there (pure XY erosion in that direction).
+                const bool near_object_top    = include_top && layer.print_z + thickness > z_top + EPSILON;
+                const bool near_object_bottom = include_bottom && layer.bottom_z() - thickness < z_bottom - EPSILON;
+                if (! near_object_top && ! near_object_bottom) {
                     core = eroded[layer_idx];
-                } else if (layer.print_z + thickness <= z_top + EPSILON && layer.bottom_z() - thickness >= z_bottom - EPSILON) {
-                    core = eroded[layer_idx];
-                    for (int j = layer_idx - 1; j >= 0 && ! core.empty(); -- j) {
-                        if (print_object.get_layer(j)->print_z <= layer.bottom_z() - thickness + EPSILON)
-                            break;
-                        core = intersection_ex(core, eroded[j]);
-                    }
-                    for (int j = layer_idx + 1; j < num_layers && ! core.empty(); ++ j) {
-                        if (print_object.get_layer(j)->bottom_z() >= layer.print_z + thickness - EPSILON)
-                            break;
-                        core = intersection_ex(core, eroded[j]);
-                    }
+                    if (include_bottom)
+                        for (int j = layer_idx - 1; j >= 0 && ! core.empty(); -- j) {
+                            if (print_object.get_layer(j)->print_z <= layer.bottom_z() - thickness + EPSILON)
+                                break;
+                            core = intersection_ex(core, eroded[j]);
+                        }
+                    if (include_top)
+                        for (int j = layer_idx + 1; j < num_layers && ! core.empty(); ++ j) {
+                            if (print_object.get_layer(j)->bottom_z() >= layer.print_z + thickness - EPSILON)
+                                break;
+                            core = intersection_ex(core, eroded[j]);
+                        }
                 }
                 band[layer_idx] = core.empty() ? merged[layer_idx] : diff_ex(merged[layer_idx], core);
             }
@@ -1366,7 +1370,7 @@ static void apply_shell_material_segmentation(PrintObject &print_object, ThrowOn
                 if (target_region_id < 0 || by_region[region_id].expolygons.empty())
                     continue;
                 const PrintRegionConfig &target_config = layer.get_region(target_region_id)->region().config();
-                const ExPolygons &band = bands.at({target_config.shell_material_thickness.value, target_config.shell_material_top_and_bottom.value})[layer_idx];
+                const ExPolygons &band = bands.at({target_config.shell_material_thickness.value, target_config.shell_material_top.value, target_config.shell_material_bottom.value})[layer_idx];
                 if (band.empty())
                     continue;
 

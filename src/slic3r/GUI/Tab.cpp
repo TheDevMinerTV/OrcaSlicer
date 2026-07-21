@@ -3018,7 +3018,8 @@ void TabPrint::build()
         optgroup->append_single_option_line("shell_material_filament_id");
         optgroup->append_single_option_line("shell_material_thickness");
         optgroup->append_single_option_line("shell_material_scope");
-        optgroup->append_single_option_line("shell_material_top_and_bottom");
+        optgroup->append_single_option_line("shell_material_top");
+        optgroup->append_single_option_line("shell_material_bottom");
         optgroup->append_single_option_line("shell_material_sparse_infill_density");
         optgroup->append_single_option_line("shell_material_sparse_infill_pattern");
         optgroup->append_single_option_line("shell_material_wall_loops");

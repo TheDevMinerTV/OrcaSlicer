@@ -357,7 +357,7 @@ TEST_CASE("Shell material can be scoped by a modifier mesh", "[ShellMaterial]")
     }
 }
 
-// With "shell on top and bottom" disabled, the band is a pure XY erosion: every layer keeps a core,
+// With shell disabled on top and bottom, the band is a pure XY erosion: every layer keeps a core,
 // including the ones within the shell thickness of the object's top and bottom faces.
 TEST_CASE("Shell can be limited to the sides", "[ShellMaterial]")
 {
@@ -366,7 +366,8 @@ TEST_CASE("Shell can be limited to the sides", "[ShellMaterial]")
         multifilament_config(2, {
             { "shell_material_filament_id",   2 },
             { "shell_material_thickness",     2. },
-            { "shell_material_top_and_bottom", false },
+            { "shell_material_top",           false },
+            { "shell_material_bottom",        false },
             { "layer_height",                 0.2 },
             { "initial_layer_print_height",   0.2 },
             { "elefant_foot_compensation",    0. },
@@ -383,6 +384,43 @@ TEST_CASE("Shell can be limited to the sides", "[ShellMaterial]")
         INFO("print_z " << layer->print_z);
         CHECK_THAT(slices_area_mm2(*core), WithinRel(256., 0.02));
         CHECK_THAT(slices_area_mm2(*shell), WithinRel(144., 0.02));
+    }
+}
+
+// The top and bottom sides toggle independently: with only the top enabled, the bottom layers keep
+// their core while the topmost band turns into full shell.
+TEST_CASE("Top and bottom shell toggle separately", "[ShellMaterial]")
+{
+    Print print;
+    init_and_process_print({ cube(20) }, print,
+        multifilament_config(2, {
+            { "shell_material_filament_id",   2 },
+            { "shell_material_thickness",     2. },
+            { "shell_material_top",           true },
+            { "shell_material_bottom",        false },
+            { "layer_height",                 0.2 },
+            { "initial_layer_print_height",   0.2 },
+            { "elefant_foot_compensation",    0. },
+            { "skirt_loops",                  0 },
+            { "brim_type",                    "no_brim" },
+        }));
+
+    const PrintObject &object = *print.objects().front();
+    REQUIRE_FALSE(object.layers().empty());
+    for (const Layer *layer : object.layers()) {
+        const auto [core, shell] = core_and_shell(*layer);
+        REQUIRE(core != nullptr);
+        REQUIRE(shell != nullptr);
+        INFO("print_z " << layer->print_z);
+        if (layer->print_z > 18. + EPSILON) {
+            // Top band: full shell.
+            CHECK(slices_area_mm2(*core) == 0.);
+            CHECK_THAT(slices_area_mm2(*shell), WithinRel(400., 0.02));
+        } else {
+            // Everywhere else, including the bottom 2mm: side band only.
+            CHECK_THAT(slices_area_mm2(*core), WithinRel(256., 0.02));
+            CHECK_THAT(slices_area_mm2(*shell), WithinRel(144., 0.02));
+        }
     }
 }
 

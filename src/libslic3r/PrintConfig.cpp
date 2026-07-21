@@ -3504,12 +3504,19 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionInt(-1));
 
-    def = this->add("shell_material_top_and_bottom", coBool);
-    def->label = L("Shell material on top and bottom");
+    def = this->add("shell_material_top", coBool);
+    def->label = L("Shell material on top");
     def->category = L("Strength");
-    def->tooltip = L("When enabled, the topmost and bottommost N millimeters of the object also print in the shell "
-                     "material. When disabled, the shell is applied only around the sides and the top/bottom faces "
-                     "keep the core material.");
+    def->tooltip = L("When enabled, the topmost N millimeters of the object (and areas near top surfaces) also print "
+                     "in the shell material. When disabled, top faces keep the core material.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("shell_material_bottom", coBool);
+    def->label = L("Shell material on bottom");
+    def->category = L("Strength");
+    def->tooltip = L("When enabled, the bottommost N millimeters of the object (and areas near bottom surfaces) also "
+                     "print in the shell material. When disabled, bottom faces keep the core material.");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(true));
 

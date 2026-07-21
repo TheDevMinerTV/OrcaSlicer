@@ -1332,7 +1332,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionEnum<InfillPattern>, shell_material_sparse_infill_pattern))
     ((ConfigOptionInt,                 shell_material_wall_loops))
     ((ConfigOptionInt,                 shell_material_interface_wall_loops))
-    ((ConfigOptionBool,                shell_material_top_and_bottom))
+    ((ConfigOptionBool,                shell_material_top))
+    ((ConfigOptionBool,                shell_material_bottom))
     ((ConfigOptionEnum<ShellMaterialScope>, shell_material_scope))
     // Detect bridging perimeters
     ((ConfigOptionBool, detect_overhang_wall))

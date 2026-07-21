@@ -813,7 +813,8 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig *config, in
     toggle_field("shell_material_sparse_infill_pattern", have_shell_material);
     toggle_field("shell_material_wall_loops", have_shell_material);
     toggle_field("shell_material_interface_wall_loops", have_shell_material);
-    toggle_field("shell_material_top_and_bottom", have_shell_material);
+    toggle_field("shell_material_top", have_shell_material);
+    toggle_field("shell_material_bottom", have_shell_material);
     toggle_field("shell_material_scope", have_shell_material);
 
     bool have_brim_ear = (config->opt_enum<BrimType>("brim_type") == btEar);
