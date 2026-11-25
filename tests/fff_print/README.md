@@ -34,6 +34,7 @@ If you touched code in a subsystem, its test file is where your test goes. If a 
 | `test_support_material` | `Support/` | support & raft layers, contact distance |
 | `test_cooling` | `GCode/CoolingBuffer.cpp` | fan control, speed-marker consumption |
 | `test_multifilament` | `GCode/ToolOrdering.cpp` | per-feature and per-object filament routing |
+| `test_shell_material` | `PrintObjectSlice.cpp`, `PrintApply.cpp` | shell material band: region split geometry, filament routing |
 | `test_print` | `Print.{c,h}pp` | `validate()`, solid-shell behavior, sequential printing, custom G-code & config comments, default-slice smoke |
 
 Paths are under `src/libslic3r/`. A trailing `/` is a directory of related files; otherwise it is a single class. `{c,h}pp` means the `.cpp`/`.hpp` pair.

@@ -728,13 +728,13 @@ void Preset::save(DynamicPrintConfig* parent_config)
                     opt_dst->set(opt_src);
             }
         }
-        temp_config.save_to_json(this->file, bare_name, from_str, this->version.to_string());
+        temp_config.save_to_json(this->file, bare_name, from_str, this->version.to_string(), Preset::get_type_string(this->type));
     } else if (!filament_id.empty() && inherits().empty()) {
         DynamicPrintConfig temp_config = config;
         temp_config.set_key_value(BBL_JSON_KEY_FILAMENT_ID, new ConfigOptionString(filament_id));
-        temp_config.save_to_json(this->file, bare_name, from_str, this->version.to_string());
+        temp_config.save_to_json(this->file, bare_name, from_str, this->version.to_string(), Preset::get_type_string(this->type));
     } else {
-        this->config.save_to_json(this->file, bare_name, from_str, this->version.to_string());
+        this->config.save_to_json(this->file, bare_name, from_str, this->version.to_string(), Preset::get_type_string(this->type));
     }
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " save config for: " << this->name << " and filament_id: " << filament_id << " and base_id: " << this->base_id;
 
@@ -1037,6 +1037,15 @@ static std::vector<std::string> s_Preset_print_options{
     "fill_multiline",
     "gyroid_optimized",
     "sparse_infill_pattern",
+    "shell_material_filament_id",
+    "shell_material_thickness",
+    "shell_material_sparse_infill_density",
+    "shell_material_sparse_infill_pattern",
+    "shell_material_wall_loops",
+    "shell_material_interface_wall_loops",
+    "shell_material_top",
+    "shell_material_bottom",
+    "shell_material_scope",
     "lateral_lattice_angle_1",
     "lateral_lattice_angle_2",
     "infill_overhang_angle",

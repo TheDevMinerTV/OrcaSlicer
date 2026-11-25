@@ -806,6 +806,17 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig *config, in
     toggle_field("outer_wall_filament_id", have_perimeters || have_brim);
     toggle_field("inner_wall_filament_id", have_perimeters || have_brim);
 
+    // Shell material options only apply while a shell material filament is selected.
+    bool have_shell_material = config->opt_int("shell_material_filament_id") > 0;
+    toggle_field("shell_material_thickness", have_shell_material);
+    toggle_field("shell_material_sparse_infill_density", have_shell_material);
+    toggle_field("shell_material_sparse_infill_pattern", have_shell_material);
+    toggle_field("shell_material_wall_loops", have_shell_material);
+    toggle_field("shell_material_interface_wall_loops", have_shell_material);
+    toggle_field("shell_material_top", have_shell_material);
+    toggle_field("shell_material_bottom", have_shell_material);
+    toggle_field("shell_material_scope", have_shell_material);
+
     bool have_brim_ear = (config->opt_enum<BrimType>("brim_type") == btEar);
     const auto brim_width = config->opt_float("brim_width");
     // disable brim_ears_max_angle and brim_ears_detection_length if brim_width is 0

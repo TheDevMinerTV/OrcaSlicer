@@ -1997,6 +1997,15 @@ int CLI::run(int argc, char **argv)
             if (type_iter != key_values.end()) {
                 config_type = type_iter->second;
             }
+            // User-saved presets (from == "User") often omit the "type" field.
+            // Infer it from the parent directory name ("machine"/"process"/"filament").
+            if (config_type.empty()) {
+                std::string parent = boost::filesystem::path(file).parent_path().filename().string();
+                if (parent == "machine" || parent == "process" || parent == "filament") {
+                    config_type = parent;
+                    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": inferred config type %1% from path for %2%") % config_type % file;
+                }
+            }
             if (config_type == "machine") {
                 //config.set("printer_settings_id", config_name, true);
                 //printer_inherits = config.option<ConfigOptionString>("inherits", true)->value;
@@ -6609,9 +6618,9 @@ int CLI::run(int argc, char **argv)
                 colors_out[color_idx] = ColorRGBA(float(rgb_color[0]) / 255.f, float(rgb_color[1]) / 255.f, float(rgb_color[2]) / 255.f, float(rgb_color[3]) / 255.f);
             }
 
-            int gl_major, gl_minor, gl_verbos;
-            glfwGetVersion(&gl_major, &gl_minor, &gl_verbos);
-            BOOST_LOG_TRIVIAL(info) << boost::format("opengl version %1%.%2%.%3%")%gl_major %gl_minor %gl_verbos;
+            int glfw_major, glfw_minor, glfw_rev;
+            glfwGetVersion(&glfw_major, &glfw_minor, &glfw_rev);
+            BOOST_LOG_TRIVIAL(info) << boost::format("GLFW version %1%.%2%.%3%")%glfw_major %glfw_minor %glfw_rev;
 
             bool thumbnail_opengl_ready = false;
             glfwSetErrorCallback(glfw_callback);
@@ -6623,8 +6632,14 @@ int CLI::run(int argc, char **argv)
             }
             else {
                 BOOST_LOG_TRIVIAL(info) << "glfwInit Success."<< std::endl;
-                glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, gl_major);
-                glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, gl_minor);
+                // Request an OpenGL 3.2 context, the minimum version required by the
+                // thumbnail renderer. The GLFW *library* version was previously passed
+                // here by mistake; that happened to work while GLFW was 3.3 (OpenGL 3.3
+                // exists) but broke with the upgrade to GLFW 3.4 (there is no OpenGL
+                // 3.4), making glfwCreateWindow fail with GLFW_INVALID_VALUE and
+                // silently skipping all CLI thumbnail rendering.
+                glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+                glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
                 glfwWindowHint(GLFW_RED_BITS, 8);
                 glfwWindowHint(GLFW_GREEN_BITS, 8);
                 glfwWindowHint(GLFW_BLUE_BITS, 8);
